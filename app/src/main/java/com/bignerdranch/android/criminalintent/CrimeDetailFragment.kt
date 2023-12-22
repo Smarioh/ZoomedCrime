@@ -1,8 +1,10 @@
 package com.bignerdranch.android.criminalintent
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
@@ -10,6 +12,7 @@ import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.core.view.doOnLayout
@@ -25,21 +28,40 @@ import androidx.navigation.fragment.navArgs
 import com.bignerdranch.android.criminalintent.databinding.FragmentCrimeDetailBinding
 import kotlinx.coroutines.launch
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
-import java.text.DateFormat as DF
+import android.graphics.Bitmap
+import java.io.FileOutputStream
 
+
+private const val DATE_FORMAT = "EEE, MMM, dd"
 
 class CrimeDetailFragment : Fragment() {
+    override fun onStart() {
+        super.onStart()
+        val crimePhoto = view?.findViewById<ImageView>(R.id.crime_photo)
+        if (crimePhoto != null) {
+            crimePhoto.setOnClickListener {
 
-    fun getLocaleDateFormat(): String {
-        val formatter = DF.getDateInstance(DF.LONG, Locale.getDefault()) as SimpleDateFormat
-        return formatter.toPattern()
+
+                val bitmap = (crimePhoto.drawable as BitmapDrawable).bitmap
+                val tempFile = saveBitmapToCache(bitmap, requireContext())
+
+                val newFragment = ZoomedDialogFragment.newInstance(tempFile)
+                newFragment.show(requireActivity().supportFragmentManager, "zoomedDialog")
+
+
+            }
+        }
     }
 
-    val DATE_FORMAT = getLocaleDateFormat()
-
+    fun saveBitmapToCache(bitmap: Bitmap, context: Context): File {
+        // Create a temporary file in the cache directory
+        val tempFile = File(context.cacheDir, "temp_image.png")
+        FileOutputStream(tempFile).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        return tempFile
+    }
     private var _binding: FragmentCrimeDetailBinding? = null
     private val binding
         get() = checkNotNull(_binding) {
@@ -58,6 +80,8 @@ class CrimeDetailFragment : Fragment() {
         uri?.let { parseContactSelection(it) }
     }
 
+    private var photoName: String? = null
+
     private val takePhoto = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { didTakePhoto: Boolean ->
@@ -67,8 +91,6 @@ class CrimeDetailFragment : Fragment() {
             }
         }
     }
-
-    private var photoName: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -108,7 +130,10 @@ class CrimeDetailFragment : Fragment() {
 
             crimeCamera.setOnClickListener {
                 photoName = "IMG_${Date()}.JPG"
-                val photoFile = File(requireContext().applicationContext.filesDir, photoName)
+                val photoFile = File(
+                    requireContext().applicationContext.filesDir,
+                    photoName
+                )
                 val photoUri = FileProvider.getUriForFile(
                     requireContext(),
                     "com.bignerdranch.android.criminalintent.fileprovider",
